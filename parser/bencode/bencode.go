@@ -21,5 +21,10 @@ func (*benCodeParser) Parse(r io.Reader) (model.BitTorrent, error) {
 		return model.BitTorrent{}, fmt.Errorf("failed to unmarshal: %w", err)
 	}
 
-	return toDomainModel(b), nil
+	domainModel, err := toDomainModel(b)
+	if err != nil {
+		return model.BitTorrent{}, fmt.Errorf("failed to tranform to domain model: %w", err)
+	}
+
+	return domainModel, nil
 }

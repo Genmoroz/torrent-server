@@ -5,18 +5,15 @@ import "time"
 type (
 	BitTorrent struct {
 		Announce     string
-		AnnounceList string
+		AnnounceList [][]string
 		Comment      string
 		CreatedBy    string
 		CreationDate time.Time
 		Encoding     string
-		Info         Info
-	}
-
-	Info struct {
-		Pieces      string
-		PieceLength int
-		Length      int
-		Name        string
+		InfoHash     [20]byte
+		PieceHashes  [][20]byte
+		PieceLength  int
+		Length       int
+		Name         string
 	}
 )
