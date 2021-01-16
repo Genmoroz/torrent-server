@@ -1,0 +1,10 @@
+goos: linux
+goarch: amd64
+pkg: torrent-server/parser/bencode
+BenchmarkParse-12    	13752229	       418 ns/op	     288 B/op	       4 allocs/op
+BenchmarkParse-12    	14370937	       419 ns/op	     288 B/op	       4 allocs/op
+BenchmarkParse-12    	14118579	       423 ns/op	     288 B/op	       4 allocs/op
+BenchmarkParse-12    	14093737	       427 ns/op	     288 B/op	       4 allocs/op
+BenchmarkParse-12    	13949880	       430 ns/op	     288 B/op	       4 allocs/op
+PASS
+ok  	torrent-server/parser/bencode	32.077s
