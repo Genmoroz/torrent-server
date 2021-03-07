@@ -1,9 +1,12 @@
 package model
 
-import "time"
+import (
+	"net"
+	"time"
+)
 
 type (
-	BitTorrent struct {
+	TorrentInfo struct {
 		Announce     string
 		AnnounceList [][]string
 		Comment      string
@@ -12,8 +15,18 @@ type (
 		Encoding     string
 		InfoHash     [20]byte
 		PieceHashes  [][20]byte
-		PieceLength  int
-		Length       int
+		PieceLength  int64
+		Length       int64
 		Name         string
+	}
+
+	TrackerInfo struct {
+		Interval int64
+		Peers    []PeerInfo
+	}
+
+	PeerInfo struct {
+		IP   net.IP
+		Port uint16
 	}
 )

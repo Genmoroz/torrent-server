@@ -1,15 +1,15 @@
 package main
 
 import (
-	"bufio"
-	"crypto/rand"
 	"fmt"
 	"log"
-	"net"
+	"math/rand"
 	"time"
-	"torrent-server/client"
-	"torrent-server/loader"
-	"torrent-server/parser/bencode"
+
+	"github.com/genvmoroz/simple-torrent-client/downloader"
+	"github.com/genvmoroz/simple-torrent-client/loader"
+	"github.com/genvmoroz/simple-torrent-client/model"
+	"github.com/genvmoroz/simple-torrent-client/parser/bencode"
 )
 
 func main() {
@@ -23,63 +23,29 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	torrent, err := bencode.NewParser().Parse(content)
-	url, err := client.PrepareTrackerURL(torrent, peerID, 6881)
+
+	torrentInfo, err := bencode.ParseTorrentInfo(content)
+
+	torrentDownloader, err := downloader.NewTorrentDownloader(peerID, []model.TorrentInfo{torrentInfo}, 10*time.Second)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	go func() {
-		pc, err := net.ListenPacket("udp", ":8080")
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer pc.Close()
-
-		for {
-			buf := make([]byte, 1024)
-			n, addr, err := pc.ReadFrom(buf)
-			if err != nil {
-				continue
-			}
-			go serve(pc, addr, buf[:n])
-		}
-	}()
-
-	conn, err := net.Dial("udp", "localhost:8080")
-	if err != nil {
+	if err = torrentDownloader.Download(); err != nil {
 		log.Fatalln(err)
 	}
-	httpReq := fmt.Sprintf(
-		`GET %s?%s HTTP/1.1`,
-		url.Path,
-		url.RawQuery,
-	)
-	n, err := fmt.Fprintf(conn, httpReq)
-	//conn.Write()
-	//n, err := conn.Write([]byte(httpReq))
-	if err != nil {
-		log.Fatalln(err)
-	}
-	fmt.Println("writen ", n, " bytes")
-
-	status, err := bufio.NewReader(conn).ReadByte()
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	time.Sleep(99999 * time.Second)
-
-	fmt.Println(status)
-	//if err = client.Get(url); err != nil {
-	//	log.Fatal(err)
-	//}
 }
 
-func serve(pc net.PacketConn, addr net.Addr, buf []byte) {
-	// 0 - 1: ID
-	// 2: QR(1): Opcode(4)
-	buf[2] |= 0x80 // Set QR bit
+type workingBatch struct {
+	index  int
+	hash   [20]byte
+	length int
+}
 
-	pc.WriteTo(buf, addr)
+func download(t model.TorrentInfo) {
+	//workingBatches := make(chan *workingBatch, len(t.PieceHashes))
+
+	//goroutinesHum := runtime.NumCPU()
+
+	fmt.Println(t.PieceLength / 20)
 }

@@ -3,22 +3,28 @@ package bencode
 import (
 	"bytes"
 	"crypto/sha1"
+	"encoding/binary"
 	"fmt"
-	"github.com/jackpal/bencode-go"
 	"time"
 
-	"torrent-server/model"
+	"github.com/genvmoroz/simple-torrent-client/model"
+	"github.com/jackpal/bencode-go"
 )
 
-func toDomainModel(torrent bitTorrent) (model.BitTorrent, error) {
+const (
+	hashLen  = 20 // Length of SHA-1 hash
+	peerSize = 6  // 4 for IP, 2 for port
+)
+
+func toDomainBitTorrent(torrent bitTorrent) (model.TorrentInfo, error) {
 	pieceHashes, err := splitPieceHashes(torrent.Info.Pieces)
 	if err != nil {
-		return model.BitTorrent{}, fmt.Errorf("failed to split piece hashes: %w", err)
+		return model.TorrentInfo{}, fmt.Errorf("failed to split piece hashes: %w", err)
 	}
 
 	infoHash, err := infoHash(torrent.Info)
 
-	return model.BitTorrent{
+	return model.TorrentInfo{
 		Announce:     torrent.Announce,
 		AnnounceList: torrent.AnnounceList,
 		Comment:      torrent.Comment,
@@ -33,9 +39,35 @@ func toDomainModel(torrent bitTorrent) (model.BitTorrent, error) {
 	}, nil
 }
 
-func splitPieceHashes(s string) ([][20]byte, error) {
-	hashLen := 20 // Length of SHA-1 hash
+func toDomainTrackerInfoWithoutPeersInfo(tr trackerResponse) (model.TrackerInfo, error) {
+	peers, err := parsePeers([]byte(tr.Peers))
+	if err != nil {
+		return model.TrackerInfo{}, fmt.Errorf("failed to parse Peers: %w", err)
+	}
 
+	return model.TrackerInfo{
+		Interval: tr.Interval,
+		Peers:    peers,
+	}, nil
+}
+
+func parsePeers(rawPeers []byte) ([]model.PeerInfo, error) {
+	numPeers := len(rawPeers) / peerSize
+	if len(rawPeers)%peerSize != 0 {
+		return nil, fmt.Errorf("received malformed peers")
+	}
+
+	peers := make([]model.PeerInfo, numPeers)
+	for i := 0; i < numPeers; i++ {
+		offset := i * peerSize
+		peers[i].IP = rawPeers[offset : offset+4]
+		peers[i].Port = binary.BigEndian.Uint16(rawPeers[offset+4 : offset+6])
+	}
+
+	return peers, nil
+}
+
+func splitPieceHashes(s string) ([][20]byte, error) {
 	buf := []byte(s)
 	if len(buf)%hashLen != 0 {
 		return nil, fmt.Errorf("received malformed pieces of length %d", len(buf))

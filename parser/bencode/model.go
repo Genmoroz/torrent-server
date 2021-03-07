@@ -13,8 +13,13 @@ type (
 
 	info struct {
 		Pieces      string `bencode:"pieces"`
-		PieceLength int    `bencode:"piece length"`
-		Length      int    `bencode:"length"`
+		PieceLength int64  `bencode:"piece length"`
+		Length      int64  `bencode:"length"`
 		Name        string `bencode:"name"`
+	}
+
+	trackerResponse struct {
+		Interval int64  `bencode:"interval"`
+		Peers    string `bencode:"peers"`
 	}
 )

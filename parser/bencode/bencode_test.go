@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"torrent-server/model"
+	"github.com/genvmoroz/simple-torrent-client/model"
 )
 
 var (
 	correctText        = "d8:announce12:testAnnounce13:announce-listll13:testAnnounce1el13:testAnnounce2ee7:comment11:testComment10:created by14:uTorrent/3.5.513:creation datei1609502400e8:encoding5:UTF-84:infod6:lengthi835109565e4:name8:testName12:piece lengthi1048576e6:pieces20:testPiecesTestPiecesee"
-	expectedBitTorrent = model.BitTorrent{
+	expectedBitTorrent = model.TorrentInfo{
 		Announce: "testAnnounce",
 		AnnounceList: append(make([][]string, 0, 8),
 			append(make([]string, 0, 8), "testAnnounce1"),
@@ -41,7 +41,7 @@ func TestBenCodeParserParse(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    model.BitTorrent
+		want    model.TorrentInfo
 		wantErr bool
 	}{
 		{
@@ -57,8 +57,7 @@ func TestBenCodeParserParse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			be := &benCodeParser{}
-			got, err := be.Parse(tt.args.r)
+			got, err := ParseTorrentInfo(tt.args.r)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Parse() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -67,13 +66,5 @@ func TestBenCodeParserParse(t *testing.T) {
 				t.Errorf("Parse() got = %v, want %v", got, tt.want)
 			}
 		})
-	}
-}
-
-func BenchmarkParse(b *testing.B) {
-	bParser := NewParser()
-	reader := strings.NewReader(correctText)
-	for i := 0; i < b.N; i++ {
-		_, _ = bParser.Parse(reader)
 	}
 }
