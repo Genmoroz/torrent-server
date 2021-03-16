@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"log"
 	"math/rand"
 	"time"
@@ -31,21 +31,9 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	if err = torrentDownloader.Download(); err != nil {
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Hour)
+
+	if err = torrentDownloader.Download(ctx); err != nil {
 		log.Fatalln(err)
 	}
-}
-
-type workingBatch struct {
-	index  int
-	hash   [20]byte
-	length int
-}
-
-func download(t model.TorrentInfo) {
-	//workingBatches := make(chan *workingBatch, len(t.PieceHashes))
-
-	//goroutinesHum := runtime.NumCPU()
-
-	fmt.Println(t.PieceLength / 20)
 }

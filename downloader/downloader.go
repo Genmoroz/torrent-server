@@ -1,6 +1,7 @@
 package downloader
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
@@ -30,9 +31,16 @@ func NewTorrentDownloader(peerID [20]byte, torrentInfo []model.TorrentInfo, time
 	}, nil
 }
 
-func (d *TorrentDownloader) Download() error {
+func (d *TorrentDownloader) Download(ctx context.Context) error {
 	ticker := time.NewTicker(time.Minute)
 
+	for _, torrent := range d.torrents {
+		go func(t *Torrent) {
+			if err := t.Download(ctx); err != nil {
+				log.Printf("failed to start downloading: %s", err.Error())
+			}
+		}(torrent)
+	}
 	for {
 		for _, torrent := range d.torrents {
 			if torrent == nil {
@@ -46,7 +54,8 @@ func (d *TorrentDownloader) Download() error {
 		}
 
 		select {
-
+		case <-ctx.Done():
+			return nil
 		case <-ticker.C:
 		}
 	}
