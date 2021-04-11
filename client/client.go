@@ -67,7 +67,7 @@ func appendWithoutDuplicates(peers []model.PeerInfo, peer model.PeerInfo) []mode
 	return peers
 }
 
-func getTrackerInfo(infoHash, peerID [20]byte, announce string, length int64, port uint16) (model.TrackerInfo, error) {
+func getTrackerInfo(infoHash, peerID [20]byte, announce string, length uint32, port uint16) (model.TrackerInfo, error) {
 	trackerUrl, err := PrepareTrackerURL(infoHash, peerID, announce, length, port)
 	if err != nil {
 		return model.TrackerInfo{}, fmt.Errorf("failed to prepare TrackerURL: %w", err)
@@ -101,7 +101,7 @@ func prepareGetRequestUrl(u url.URL) string {
 	)
 }
 
-func PrepareTrackerURL(infoHash, peerID [20]byte, announce string, length int64, port uint16) (*url.URL, error) {
+func PrepareTrackerURL(infoHash, peerID [20]byte, announce string, length uint32, port uint16) (*url.URL, error) {
 	base, err := url.Parse(announce)
 	if err != nil {
 		return nil, err
@@ -113,7 +113,7 @@ func PrepareTrackerURL(infoHash, peerID [20]byte, announce string, length int64,
 		"uploaded":   []string{"0"},
 		"downloaded": []string{"0"},
 		"compact":    []string{"1"},
-		"left":       []string{strconv.FormatInt(length, 10)},
+		"left":       []string{strconv.FormatUint(uint64(length), 10)},
 	}
 
 	base.RawQuery = params.Encode()

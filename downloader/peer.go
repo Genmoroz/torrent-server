@@ -11,8 +11,6 @@ import (
 	"sync"
 )
 
-const pstr = "BitTorrent protocol"
-
 type (
 	Peers struct {
 		peerIPs   []string
@@ -21,9 +19,11 @@ type (
 	}
 
 	Peer struct {
-		conn   net.Conn
-		ip     string
-		choked bool
+		conn       net.Conn
+		ip         string
+		choked     bool
+		downloaded uint32
+		backlog    uint32
 	}
 
 	handshakeMessage struct {
@@ -57,6 +57,8 @@ func ConnectToPeer(network, ip string, port uint16, infoHash, peerID [20]byte) (
 		ip:   ip,
 	}, nil
 }
+
+const pstr = "BitTorrent protocol"
 
 func doHandshake(conn *net.TCPConn, infoHash, peerID [20]byte) error {
 	expected := handshakeMessage{
@@ -116,6 +118,7 @@ func readHandshakeMessage(conn *net.TCPConn) (*handshakeMessage, error) {
 		peerID:   peerID,
 	}, nil
 }
+
 func prepareHandshakeMessage(msg handshakeMessage) []byte {
 	buf := make([]byte, len(msg.pstr)+49)
 	buf[0] = byte(len(msg.pstr))
@@ -125,6 +128,60 @@ func prepareHandshakeMessage(msg handshakeMessage) []byte {
 	offset += copy(buf[offset:], msg.infoHash[:])
 	offset += copy(buf[offset:], msg.peerID[:])
 	return buf
+}
+
+func (p *Peer) ReadMessage() error {
+	lengthBuf := make([]byte, 4)
+	if err := readFull(p.conn, lengthBuf); err != nil {
+		return err
+	}
+	length := binary.BigEndian.Uint32(lengthBuf)
+
+	// keep-alive message
+	if length == 0 {
+		return nil
+	}
+
+	messageBuf := make([]byte, length)
+	if err := readFull(p.conn, messageBuf); err != nil {
+		return err
+	}
+
+	msg := &Message{
+		ID:      messageID(messageBuf[0]),
+		Payload: messageBuf[1:],
+	}
+
+	switch msg.ID {
+	case MsgUnchoke:
+		p.choked = false
+		return nil
+	case MsgChoke:
+		p.choked = true
+		return nil
+	case MsgHave:
+		index, err := parseHaveMessage(msg)
+		if err != nil {
+			return err
+		}
+		state.client.Bitfield.SetPiece(index)
+	case MsgPiece:
+		n, err := message.ParsePiece(p.index, state.buf, msg)
+		if err != nil {
+			return err
+		}
+		p.downloaded += n
+		p.backlog--
+	default:
+		return fmt.Errorf("handler for messageID [%d] does not exist", msg.ID)
+	}
+
+	return nil
+}
+
+func readFull(r io.Reader, buf []byte) error {
+	_, err := io.ReadFull(r, buf)
+	return err
 }
 
 func (p *Peers) addPeer(peerIP string, peer *Peer) error {
@@ -169,61 +226,19 @@ func (p *Peers) existPeerIP(peerIP string) bool {
 	return false
 }
 
-func (p *Peer) SendRequest(index, begin, length int64) error {
+func (p *Peer) SendRequest(index, begin, length uint32) error {
 	req := FormatRequest(index, begin, length)
 	_, err := p.conn.Write(req.Serialize())
 	return err
 }
 
-type messageID uint8
-
-const (
-	// MsgChoke chokes the receiver
-	MsgChoke messageID = 0
-	// MsgUnchoke unchokes the receiver
-	MsgUnchoke messageID = 1
-	// MsgInterested expresses interest in receiving data
-	MsgInterested messageID = 2
-	// MsgNotInterested expresses disinterest in receiving data
-	MsgNotInterested messageID = 3
-	// MsgHave alerts the receiver that the sender has downloaded a piece
-	MsgHave messageID = 4
-	// MsgBitfield encodes which pieces that the sender has downloaded
-	MsgBitfield messageID = 5
-	// MsgRequest requests a block of data from the receiver
-	MsgRequest messageID = 6
-	// MsgPiece delivers a block of data to fulfill a request
-	MsgPiece messageID = 7
-	// MsgCancel cancels a request
-	MsgCancel messageID = 8
-)
-
-// Message stores ID and payload of a message
-type Message struct {
-	ID      messageID
-	Payload []byte
-}
-
-// FormatRequest creates a REQUEST message
-func FormatRequest(index, begin, length int64) *Message {
-	payload := make([]byte, 12)
-	binary.BigEndian.PutUint64(payload[0:4], uint64(index))
-	binary.BigEndian.PutUint64(payload[4:8], uint64(begin))
-	binary.BigEndian.PutUint64(payload[8:12], uint64(length))
-	return &Message{ID: MsgRequest, Payload: payload}
-}
-
-// Serialize serializes a message into a buffer of the form
-// <length prefix><message ID><payload>
-// Interprets `nil` as a keep-alive message
-func (m *Message) Serialize() []byte {
-	if m == nil {
-		return make([]byte, 4)
+func parseHaveMessage(msg *Message) (uint32, error) {
+	if msg.ID != MsgHave {
+		return 0, fmt.Errorf("expected HAVE (ID %d), got ID %d", MsgHave, msg.ID)
 	}
-	length := uint32(len(m.Payload) + 1) // +1 for id
-	buf := make([]byte, 4+length)
-	binary.BigEndian.PutUint32(buf[0:4], length)
-	buf[4] = byte(m.ID)
-	copy(buf[5:], m.Payload)
-	return buf
+	if len(msg.Payload) != 4 {
+		return 0, fmt.Errorf("expected payload length 4, got length %d", len(msg.Payload))
+	}
+
+	return binary.BigEndian.Uint32(msg.Payload), nil
 }

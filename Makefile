@@ -1,7 +1,7 @@
 
 .PHONY: deps
 deps:
-	go mod tidy
+	go mod tidy -v
 	go mod download
-	go mod vendor
+	go mod vendor -v
 	go mod verify

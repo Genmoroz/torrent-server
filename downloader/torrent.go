@@ -25,18 +25,18 @@ type (
 	}
 
 	workPiece struct {
-		index  int
+		index  uint32
 		hash   [20]byte
-		length int64
+		length uint32
 	}
 
 	workResult struct {
-		index int
+		index uint32
 		buf   []byte
 	}
 )
 
-func calculateWorkPieceLength(index, pieceLength, fileLength int64) int64 {
+func calculateWorkPieceLength(index, pieceLength, fileLength uint32) uint32 {
 	begin := index * pieceLength
 	end := begin + pieceLength
 	if end > fileLength {
@@ -50,9 +50,9 @@ func NewTorrent(peerID [20]byte, torrentInfo model.TorrentInfo, timeout time.Dur
 	workPool := make(chan *workPiece, len(torrentInfo.PieceHashes))
 	for index, hash := range torrentInfo.PieceHashes {
 		workPool <- &workPiece{
-			index,
+			uint32(index),
 			hash,
-			calculateWorkPieceLength(int64(index), torrentInfo.PieceLength, torrentInfo.Length),
+			calculateWorkPieceLength(uint32(index), torrentInfo.PieceLength, torrentInfo.Length),
 		}
 	}
 
@@ -140,7 +140,7 @@ func (t *Torrent) writeFile(f *os.File, r *workResult) error {
 		return errors.New("workResult cannot be nil")
 	}
 
-	number, err := f.WriteAt(r.buf, t.torrentInfo.PieceLength*int64(r.index))
+	number, err := f.WriteAt(r.buf, int64(t.torrentInfo.PieceLength*r.index))
 	if err != nil {
 		return fmt.Errorf("failed to write piece into file: %w", err)
 	}
@@ -149,6 +149,8 @@ func (t *Torrent) writeFile(f *os.File, r *workResult) error {
 
 	return nil
 }
+
+const maxBacklog uint32 = 5
 
 func (t *Torrent) download(ctx context.Context, peer *Peer, resultChan chan *workResult) error {
 	if peer == nil {
@@ -159,7 +161,6 @@ func (t *Torrent) download(ctx context.Context, peer *Peer, resultChan chan *wor
 			log.Printf("failed to remove peerIP: %s", err.Error())
 		}
 	}()
-	var maxBacklog int64 = 5
 	for {
 		select {
 		case <-ctx.Done():
@@ -167,29 +168,28 @@ func (t *Torrent) download(ctx context.Context, peer *Peer, resultChan chan *wor
 		case work := <-t.workPool:
 			downloadBuff := make([]byte, work.length)
 
-			var downloaded, requested, backlog int64 = 0, 0, 0
+			var downloaded, requested, backlog uint32 = 0, 0, 0
 
-			for int64(downloaded) < work.length {
+			for downloaded < work.length {
 				if !peer.choked {
-					for backlog < maxBacklog && (requested) < work.length {
+					for backlog < maxBacklog && requested < work.length {
 						blockSize := maxBacklog
 						// Last block might be shorter than the typical block
-						if work.length-int64(requested) < int64(blockSize) {
-							blockSize = work.length - int64(requested)
+						if work.length-requested < blockSize {
+							blockSize = work.length - requested
 						}
 
-						err := peer.SendRequest(int64(work.index), requested, blockSize)
-						if err != nil {
+						if err := peer.SendRequest(work.index, requested, blockSize); err != nil {
 							return err
 						}
+
 						backlog++
 						requested += blockSize
 					}
 				}
 
-				err := state.readMessage()
-				if err != nil {
-					return nil, err
+				if err := peer.ReadMessage(); err != nil {
+					return err
 				}
 			}
 			// todo: do download

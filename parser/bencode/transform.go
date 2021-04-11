@@ -29,7 +29,7 @@ func toDomainBitTorrent(torrent bitTorrent) (model.TorrentInfo, error) {
 		AnnounceList: torrent.AnnounceList,
 		Comment:      torrent.Comment,
 		CreatedBy:    torrent.CreatedBy,
-		CreationDate: time.Unix(torrent.CreationDate, 0),
+		CreationDate: time.Unix(int64(torrent.CreationDate), 0),
 		Encoding:     torrent.Encoding,
 		InfoHash:     infoHash,
 		PieceHashes:  pieceHashes,

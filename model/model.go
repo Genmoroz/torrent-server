@@ -15,13 +15,13 @@ type (
 		Encoding     string
 		InfoHash     [20]byte
 		PieceHashes  [][20]byte
-		PieceLength  int64
-		Length       int64
+		PieceLength  uint32
+		Length       uint32
 		Name         string
 	}
 
 	TrackerInfo struct {
-		Interval int64
+		Interval uint32
 		Peers    []PeerInfo
 	}
 

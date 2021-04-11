@@ -34,7 +34,7 @@ var (
 	corruptedText = "corrupted"
 )
 
-func TestBenCodeParserParse(t *testing.T) {
+func TestParseTorrentInfo(t *testing.T) {
 	type args struct {
 		r io.Reader
 	}
