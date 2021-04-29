@@ -1,3 +1,4 @@
+include ./linting.mk
 
 .PHONY: deps
 deps:
